@@ -103,13 +103,30 @@ pub fn (mut s Search) think(mut b Board, depth_limit int, time_limit_ms int) Sea
 		elapsed := time.now().unix_milli() - start_time
 		nps := if elapsed > 0 { s.nodes * 1000 / u64(elapsed) } else { 0 }
 		
-		print("info depth $depth score cp $score nodes $s.nodes time $elapsed nps $nps pv")
+		// Format score: check if it's a mate score
+		if score > 9000 {
+			// Positive mate score - we're mating opponent
+			mate_in := (mate_score - score + 1) / 2
+			print("info depth $depth score mate $mate_in nodes $s.nodes time $elapsed nps $nps pv")
+		} else if score < -9000 {
+			// Negative mate score - we're being mated
+			mate_in := -(mate_score + score + 1) / 2
+			print("info depth $depth score mate $mate_in nodes $s.nodes time $elapsed nps $nps pv")
+		} else {
+			print("info depth $depth score cp $score nodes $s.nodes time $elapsed nps $nps pv")
+		}
 		for i in 0 .. s.pv_length[0] {
 			print(" " + s.pv_table[0][i].str())
 		}
 		println("")
 		
-		if score > 9000 || score < -9000 { break } // Mate found
+		if score > 9000 || score < -9000 { 
+			// Found a mate - but only stop if we've searched at least depth 3
+			// This ensures we find mates-in-1 properly (need depth 2+)
+			if depth >= 3 {
+				break
+			}
+		}
 	}
 	
 	return SearchResult{best_move: best_move, score: score, nodes: s.nodes}
@@ -153,8 +170,8 @@ fn (mut s Search) search(mut b Board, alpha int, beta int, depth int) int {
 	
 	s.nodes++
 	
-	// Check for repetition - don't check at root (ply == 0)
-	if b.ply > 0 && b.reps() > 0 { return 0 }
+	// Only check 50-move rule as a FORCED draw
+	// Don't check repetitions here - they should be handled as draw options, not forced
 	if b.fifty >= 100 { return 0 }
 	
 	// Depth safety check
@@ -320,6 +337,15 @@ fn (mut s Search) search(mut b Board, alpha int, beta int, depth int) int {
 		} else {
 			return 0 // Stalemate
 		}
+	}
+	
+	// Check for 3-fold repetition ONLY if we don't have a winning position
+	// Repetition is a CLAIM, not forced - only use it if we're not winning
+	if b.ply > 0 && alpha_local <= 0 && b.reps() >= 2 {
+		// Position occurred 2+ times before (3-fold total)
+		// And our best move doesn't give us an advantage
+		// Claim draw by repetition
+		alpha_local = 0
 	}
 	
 	// Store in transposition table
