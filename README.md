@@ -16,6 +16,9 @@ This project aims to be a faithful yet idiomatic port of TSCP to V, leveraging V
 ### Search
 - **Algorithm**: Negamax with Alpha-Beta pruning.
 - **Enhancements**:
+  - **Transposition Table**: 64 MB hash table to store previously evaluated positions, avoiding redundant searches and enabling significant speedup.
+  - **Null Move Pruning**: Forward pruning technique that gives the opponent a free move to quickly prove that the current position is too good to be worth searching deeply.
+  - **Killer Moves Heuristic**: Stores quiet moves that caused beta cutoffs at each ply, improving move ordering for non-captures.
   - **Iterative Deepening**: Progressively deeper searches to manage time and improve move ordering.
   - **Quiescence Search**: Extends search at leaf nodes for capture sequences to avoid the horizon effect.
   - **Principal Variation (PV) Table**: Caches the best line of play to improve sorting in subsequent iterations.
@@ -26,7 +29,7 @@ This project aims to be a faithful yet idiomatic port of TSCP to V, leveraging V
 A comprehensive evaluation function ported from TSCP 1.83, including:
 - **Material Balance**: Standard piece values.
 - **Piece-Square Tables**: Positional bonuses for specific piece placement.
-- **Pawn Structure**: Penalties for doubled, isolated, and backward pawns; bonuses for passed pawns.
+- **Pawn Structure**: Penalties for doubled, isolated, and backward pawns; bonuses for passed pawns with exponential scaling by rank (10cp to 180cp).
 - **King Safety**: Pawn shield evaluation and penalties for semi-open/open files near the King.
 
 ## Build Architecture
@@ -154,25 +157,16 @@ Always plays Nimzowitsch Defense (1... Nc6), which is objectively inferior:
 **Impact:** Gets positions evaluated at -0.60 to -0.82 by move 5
 **Solution Needed:** Opening book or better move selection
 
-#### 3. **Time Management Issues**
-With `st=3` (3 seconds per move), engine searches only depth 3-5 and uses ~0.07-0.10s per move.
-**Impact:** Not utilizing available thinking time effectively
-**Solution Needed:** Implement proper UCI time management to use full allocated time
-
 ### Testing Configuration
-
-**Fixed cutechess-cli Script Issue:**
-- Changed from `tc=0/0:3` (invalid format) to `st=3` (3 seconds per move)
-- Before fix: games completed in 2-5 seconds total
-- After fix: engines use full 3 seconds per move
 
 **Current Test Results (100 games, 3s/move):**
 ```
-Score: Vajra 1-28-71 vs TSCP [0.365] 
-- As White: 0-0-50 (100% draws)
-- As Black: 1-28-21 (56% losses, 42% draws, 2% wins)
-- Elo: -96.2 ± 34.3
-- Draw by repetition: 69/100 games (69%)
+Score of Vajra vs TSCP: 1 - 23 - 76  [0.390] 100
+...      Vajra playing White: 0 - 0 - 50  [0.500] 50
+...      Vajra playing Black: 1 - 23 - 26  [0.280] 50
+...      White vs Black: 23 - 1 - 76  [0.610] 100
+Elo difference: -77.7 +/- 31.4, LOS: 0.0 %, DrawRatio: 76.0 %
+SPRT: llr 0 (0.0%), lbound -inf, ubound inf
 ```
 
 ### Performance Improvements

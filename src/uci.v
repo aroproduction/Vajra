@@ -10,6 +10,7 @@ pub mut:
 
 pub fn uci_loop() {
 	mut b := new_board()
+	mut search := new_search()
 	// mut options := UCIOptions{}
 	
 	// Flush stdout immediately implies we should rely on println which V flushes usually.
@@ -52,13 +53,14 @@ pub fn uci_loop() {
 			"isready" { println("readyok") }
 			"ucinewgame" {
 				b.init_board()
-				// Clear hash etc
+				// Clear transposition table
+				search.tt.clear()
 			}
 			"position" {
 				parse_position(mut b, parts)
 			}
 			"go" {
-				parse_go(mut b, parts)
+				parse_go(mut b, parts, mut search)
 			}
 			"d" {
 				b.print()
@@ -122,7 +124,7 @@ fn parse_position(mut b Board, parts []string) {
 	}
 }
 
-fn parse_go(mut b Board, parts []string) {
+fn parse_go(mut b Board, parts []string, mut search Search) {
 	// Parse limits (wtime, btime, winc, binc, depth, nodes, etc.)
 	// For now, just simplistic
 	
@@ -167,8 +169,6 @@ fn parse_go(mut b Board, parts []string) {
 	if movetime_idx != -1 && movetime_idx+1 < parts.len {
 		time_limit = parts[movetime_idx+1].int()
 	}
-
-	mut search := new_search()
 	
 	// Default depth if not specified
 	if depth == -1 { 

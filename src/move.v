@@ -177,3 +177,47 @@ fn (mut b Board) move_piece(from int, to int) {
 	b.color[from] = empty
 	b.piece[from] = empty
 }
+
+// Null move for null move pruning
+pub fn (mut b Board) make_null_move() {
+	// Save history
+	h := Hist{
+		m: Move{}  // Null move
+		capture: empty
+		castle: b.castle
+		ep: b.ep
+		fifty: b.fifty
+		hash: b.hash
+	}
+	b.hist << h
+	b.hply++
+	b.ply++
+	
+	// Clear EP if set
+	if b.ep != -1 {
+		b.hash ^= hash_ep[b.ep]
+		b.ep = -1
+	}
+	
+	// Switch side
+	b.hash ^= hash_side
+	b.side ^= 1
+	b.xside ^= 1
+}
+
+pub fn (mut b Board) undo_null_move() {
+	if b.hist.len == 0 { return }
+	h := b.hist.pop()
+	b.hply--
+	b.ply--
+	
+	// Restore hash
+	b.hash = h.hash
+	
+	// Switch side back
+	b.side ^= 1
+	b.xside ^= 1
+	
+	// Restore state
+	b.ep = h.ep
+}

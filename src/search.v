@@ -23,11 +23,18 @@ pub mut:
 	// Move Stack (Pre-allocated)
 	move_stack []Move
 	first_move [65]int
+	
+	// Transposition Table
+	tt         TranspositionTable
+	
+	// Killer Moves (2 per ply)
+	killers    [64][2]Move
 }
 
 pub fn new_search() Search {
 	return Search{
 		move_stack: []Move{len: 0, cap: 20000} // Pre-allocate ample space
+		tt: new_tt(64) // 64 MB transposition table
 	}
 }
 
@@ -46,6 +53,15 @@ pub fn (mut s Search) think(mut b Board, depth_limit int, time_limit_ms int) Sea
 	
 	// Reset search ply
 	b.ply = 0
+	
+	// Increment TT age
+	s.tt.new_search()
+	
+	// Clear killers
+	for i in 0 .. 64 {
+		s.killers[i][0] = Move{}
+		s.killers[i][1] = Move{}
+	}
 	
 	// Reset stats?
 	// Keep history? TSCP clears history: memset(history, 0, sizeof(history));
@@ -107,6 +123,29 @@ fn (mut s Search) search(mut b Board, alpha int, beta int, depth int) int {
 	if s.stop { return 0 }
 
 	s.pv_length[b.ply] = b.ply
+	
+	// Probe transposition table
+	tt_hit := s.tt.probe(b.hash) or { TTEntry{} }
+	mut tt_move := Move{}
+	
+	if tt_hit.hash == b.hash {
+		tt_move = tt_hit.best
+		
+		// TT cutoff: use stored value if depth is sufficient
+		// BUT: Don't allow cutoffs at root (ply=0) - we need to find the actual best move
+		if b.ply > 0 && tt_hit.depth >= depth {
+			mut tt_score := int(tt_hit.score)
+			tt_score = s.tt.adjust_mate_score_from_tt(tt_score, b.ply)
+			
+			if tt_hit.flag == tt_exact {
+				return tt_score
+			} else if tt_hit.flag == tt_alpha && tt_score <= alpha {
+				return alpha
+			} else if tt_hit.flag == tt_beta && tt_score >= beta {
+				return beta
+			}
+		}
+	}
 
 	if depth == 0 {
 		return s.quiesce(mut b, alpha, beta)
@@ -127,12 +166,44 @@ fn (mut s Search) search(mut b Board, alpha int, beta int, depth int) int {
 	mut new_depth := depth - 1
 	if in_check { new_depth++ }
 	
+	// Null Move Pruning
+	// Give opponent a free move - if we're still better than beta, prune this branch
+	// Don't use in: check positions, endgame, when last move was null, at low depths
+	do_null := !in_check 
+		&& b.ply > 0  // Not at root
+		&& depth >= 3  // Sufficient depth
+		&& !b.is_endgame()  // Not in endgame
+	
+	if do_null {
+		// Make null move
+		b.make_null_move()
+		
+		// Initialize first_move for the null move ply
+		s.first_move[b.ply] = s.move_stack.len
+		
+		// Reduced depth search with null window
+		null_score := -s.search(mut b, -beta, -beta + 1, depth - 3)
+		
+		b.undo_null_move()
+		
+		if s.stop { return 0 }
+		
+		// Null move cutoff
+		if null_score >= beta {
+			return beta
+		}
+	}
+	
 	// Generate Moves using Stack
-	first_idx := s.first_move[b.ply]
+	mut first_idx := s.first_move[b.ply]
 	// Ensure stack is trimmed to current ply start (important for consistency, though recursion handles it)
 	// Actually, just append.
 	if s.move_stack.len > first_idx {
 		s.move_stack.trim(first_idx)
+	} else if s.move_stack.len < first_idx {
+		// If first_move[ply] is beyond current stack length, reset it
+		s.first_move[b.ply] = s.move_stack.len
+		first_idx = s.move_stack.len
 	}
 	
 	b.gen(mut s.move_stack)
@@ -145,7 +216,7 @@ fn (mut s Search) search(mut b Board, alpha int, beta int, depth int) int {
 	for i in 0 .. count {
 		idx := first_idx + i
 		mut m := s.move_stack[idx]
-		s.move_stack[idx].score = s.score_move(mut b, m)
+		s.move_stack[idx].score = s.score_move(mut b, m, tt_move)
 	}
 	
 	// PV following - sort_pv equivalent
@@ -164,6 +235,7 @@ fn (mut s Search) search(mut b Board, alpha int, beta int, depth int) int {
 	
 	mut legal_moves := 0
 	mut alpha_local := alpha
+	mut best_move := Move{}
 	
 	// Selection Sort Loop
 	for _ in 0 .. count {
@@ -198,6 +270,8 @@ fn (mut s Search) search(mut b Board, alpha int, beta int, depth int) int {
 		if s.stop { return 0 }
 		
 		if val > alpha_local {
+			best_move = m
+			
 			// Update History
 			// Correct logic matching TSCP:
 			// "if not capture" -> if (m.bits & 1) == 0.
@@ -207,6 +281,17 @@ fn (mut s Search) search(mut b Board, alpha int, beta int, depth int) int {
 			}
 			
 			if val >= beta {
+				// Store killer move for non-captures
+				if (m.bits & m_capture) == 0 {
+					// Shift killers down
+					s.killers[b.ply][1] = s.killers[b.ply][0]
+					s.killers[b.ply][0] = m
+				}
+				
+				// Store in TT
+				tt_score := s.tt.adjust_mate_score_to_tt(beta, b.ply)
+				s.tt.store(b.hash, depth, tt_beta, tt_score, m)
+				
 				return beta
 			}
 			alpha_local = val
@@ -237,6 +322,14 @@ fn (mut s Search) search(mut b Board, alpha int, beta int, depth int) int {
 		}
 	}
 	
+	// Store in transposition table
+	mut tt_flag := tt_alpha
+	if alpha_local > alpha {
+		tt_flag = tt_exact  // PV node
+	}
+	tt_score := s.tt.adjust_mate_score_to_tt(alpha_local, b.ply)
+	s.tt.store(b.hash, depth, tt_flag, tt_score, best_move)
+	
 	return alpha_local
 }
 
@@ -259,8 +352,13 @@ fn (mut s Search) quiesce(mut b Board, alpha int, beta int) int {
 	}
 	
 	// Generate Captures only
-	first_idx := s.first_move[b.ply]
-	if s.move_stack.len > first_idx { s.move_stack.trim(first_idx) }
+	mut first_idx := s.first_move[b.ply]
+	if s.move_stack.len > first_idx { 
+		s.move_stack.trim(first_idx) 
+	} else if s.move_stack.len < first_idx {
+		s.first_move[b.ply] = s.move_stack.len
+		first_idx = s.move_stack.len
+	}
 	
 	b.gen_caps(mut s.move_stack)
 	last_idx := s.move_stack.len
@@ -272,7 +370,7 @@ fn (mut s Search) quiesce(mut b Board, alpha int, beta int) int {
 	for i in 0 .. count {
 		idx := first_idx + i
 		mut m := s.move_stack[idx]
-		s.move_stack[idx].score = s.score_move(mut b, m)
+		s.move_stack[idx].score = s.score_move(mut b, m, Move{})
 	}
 	
 	// PV following in quiescence
@@ -332,7 +430,13 @@ fn (mut s Search) quiesce(mut b Board, alpha int, beta int) int {
 	return alpha_local
 }
 
-fn (mut s Search) score_move(mut b Board, m Move) int {
+fn (mut s Search) score_move(mut b Board, m Move, tt_move Move) int {
+	// TT move gets highest priority (after PV)
+	if tt_move.from != 0 && m.is_same(tt_move) {
+		return 9000000
+	}
+	
+	// Captures scored with MVV/LVA
 	if (m.bits & m_capture) != 0 {
 		mut victim := b.piece[m.to]
 		if (m.bits & m_ep) != 0 {
@@ -346,8 +450,17 @@ fn (mut s Search) score_move(mut b Board, m Move) int {
 		
 		attacker := b.piece[m.from]
 		return 1000000 + (victim * 10) - attacker
-	} 
-	// Quiet
+	}
+	
+	// Killer moves (quiet moves that caused beta cutoffs at this ply)
+	if m.is_same(s.killers[b.ply][0]) {
+		return 900000
+	}
+	if m.is_same(s.killers[b.ply][1]) {
+		return 800000
+	}
+	
+	// Quiet moves scored by history heuristic
 	return s.history[m.from][m.to]
 }
 

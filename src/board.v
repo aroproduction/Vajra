@@ -58,6 +58,19 @@ pub fn (mut b Board) init_board() {
 	b.set_hash()
 }
 
+// Check if we're in endgame (for null move pruning)
+// Simple heuristic: endgame if side to move has only king + pawns or very little material
+pub fn (b Board) is_endgame() bool {
+	mut material := 0
+	for i in 0 .. 64 {
+		if b.color[i] == b.side && b.piece[i] != king && b.piece[i] != pawn {
+			material += piece_value[b.piece[i]]
+		}
+	}
+	// Endgame if we have less than a rook's worth of non-pawn material
+	return material < 500
+}
+
 fn (mut b Board) place_pieces(c int, start_sq int) {
 	b.color[start_sq + 0] = c; b.piece[start_sq + 0] = rook
 	b.color[start_sq + 1] = c; b.piece[start_sq + 1] = knight

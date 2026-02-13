@@ -9,6 +9,10 @@ const rook_semi_open_file_bonus = 10
 const rook_open_file_bonus   = 15
 const rook_on_seventh_bonus  = 20
 
+// Passed pawn bonus by rank (more aggressive scaling for advanced pawns)
+// Index 0 = 2nd rank, Index 5 = 7th rank
+const passed_pawn_bonus_by_rank = [10, 20, 35, 60, 100, 180]!
+
 const pawn_value   = 100
 const knight_value = 300
 const bishop_value = 300
@@ -230,7 +234,11 @@ fn eval_light_pawn(d EvalData, sq int) int {
 	
 	// Passed
 	if d.pawn_rank[dark][f-1] >= row_idx && d.pawn_rank[dark][f] >= row_idx && d.pawn_rank[dark][f+1] >= row_idx {
-		r += (7 - row_idx) * passed_pawn_bonus
+		// Use rank-based bonus: rank 2 (row 6) = index 0, rank 7 (row 1) = index 5
+		rank_bonus_idx := 6 - row_idx // row 6->0, row 5->1, ..., row 1->5
+		if rank_bonus_idx >= 0 && rank_bonus_idx < 6 {
+			r += passed_pawn_bonus_by_rank[rank_bonus_idx]
+		}
 	}
 	
 	return r
@@ -257,7 +265,11 @@ fn eval_dark_pawn(d EvalData, sq int) int {
 	
 	// Passed
 	if d.pawn_rank[light][f-1] <= row_idx && d.pawn_rank[light][f] <= row_idx && d.pawn_rank[light][f+1] <= row_idx {
-		r += row_idx * passed_pawn_bonus
+		// Use rank-based bonus: rank 7 (row 1) = index 0, rank 2 (row 6) = index 5
+		rank_bonus_idx := row_idx - 1 // row 1->0, row 2->1, ..., row 6->5
+		if rank_bonus_idx >= 0 && rank_bonus_idx < 6 {
+			r += passed_pawn_bonus_by_rank[rank_bonus_idx]
+		}
 	}
 	
 	return r
