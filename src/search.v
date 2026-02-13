@@ -114,21 +114,16 @@ fn (mut s Search) search(mut b Board, alpha int, beta int, depth int) int {
 	
 	s.nodes++
 	
-	// Repetition check
-	if b.reps() > 0 { return 0 }
+	// Check for repetition - don't check at root (ply == 0)
+	if b.ply > 0 && b.reps() > 0 { return 0 }
 	if b.fifty >= 100 { return 0 }
+	
+	// Depth safety check
+	if b.ply >= max_ply - 1 { return b.eval() }
+	if b.hply >= 1000 - 1 { return b.eval() }
 	
 	// Check extension
 	in_check := b.in_check(b.side)
-	if in_check { 
-		// Extension logic requires caution with infinite loops, 
-		// but simple check extension +1 is standard.
-		// Note: TSCP does check extension: if (c) ++depth;
-		// But let's be careful. Pass new depth?
-		// depth is parameter. 
-	}
-	
-	// Prepare new depth
 	mut new_depth := depth - 1
 	if in_check { new_depth++ }
 	
@@ -149,24 +144,24 @@ fn (mut s Search) search(mut b Board, alpha int, beta int, depth int) int {
 	// Score moves directly in move_stack
 	for i in 0 .. count {
 		idx := first_idx + i
-		// s.move_stack[idx].score = ...
-		// V requires mut access? array elements are mutable if array is mut?
-		// "s.move_stack[idx]" gives a value copy if struct is not a reference.
-		// Wait. structs are value types.
-		// If I do `m := s.move_stack[idx]`, m is a copy.
-		// I must assign back: `s.move_stack[idx].score = val`.
-		
 		mut m := s.move_stack[idx]
-		score_val := s.score_move(mut b, m)
-		if s.follow_pv && b.ply < s.pv_length[0] && m.is_same(s.pv_table[0][b.ply]) {
-			s.follow_pv = true
-			s.move_stack[idx].score = score_val + 10000000
-		} else {
-			s.move_stack[idx].score = score_val
+		s.move_stack[idx].score = s.score_move(mut b, m)
+	}
+	
+	// PV following - sort_pv equivalent
+	if s.follow_pv {
+		s.follow_pv = false  // Reset
+		for i in 0 .. count {
+			idx := first_idx + i
+			m := s.move_stack[idx]
+			if b.ply < s.pv_length[0] && m.is_same(s.pv_table[0][b.ply]) {
+				s.follow_pv = true
+				s.move_stack[idx].score += 10000000
+				break
+			}
 		}
 	}
 	
-	// move_count := 0 // Unused
 	mut legal_moves := 0
 	mut alpha_local := alpha
 	
@@ -195,24 +190,9 @@ fn (mut s Search) search(mut b Board, alpha int, beta int, depth int) int {
 			continue
 		}
 		legal_moves++
-		
-		// PV Following Logic
-		// We only continue following the PV if we are currently following it AND this move is the PV move.
-		old_follow := s.follow_pv
-		if s.follow_pv {
-			// Check if m is the PV move
-			if b.ply < s.pv_length[0] && m.is_same(s.pv_table[0][b.ply]) {
-				s.follow_pv = true
-			} else {
-				s.follow_pv = false
-			}
-		}
 
 		val := -s.search(mut b, -beta, -alpha_local, new_depth)
 		
-		// Restore PV state
-		s.follow_pv = old_follow
-
 		b.takeback()
 		
 		if s.stop { return 0 }
@@ -282,20 +262,30 @@ fn (mut s Search) quiesce(mut b Board, alpha int, beta int) int {
 	first_idx := s.first_move[b.ply]
 	if s.move_stack.len > first_idx { s.move_stack.trim(first_idx) }
 	
-	b.gen(mut s.move_stack)
+	b.gen_caps(mut s.move_stack)
 	last_idx := s.move_stack.len
 	s.first_move[b.ply + 1] = last_idx
 	
 	count := last_idx - first_idx
 	
-	// Score moves directly in move_stack
+	// Score moves for capture ordering
 	for i in 0 .. count {
 		idx := first_idx + i
-		mut m := s.move_stack[idx] 
-		if (m.bits & m_capture) == 0 && (m.bits & m_promote) == 0 {
-			s.move_stack[idx].score = -100000001
-		} else {
-			s.move_stack[idx].score = s.score_move(mut b, m)
+		mut m := s.move_stack[idx]
+		s.move_stack[idx].score = s.score_move(mut b, m)
+	}
+	
+	// PV following in quiescence
+	if s.follow_pv {
+		s.follow_pv = false
+		for i in 0 .. count {
+			idx := first_idx + i
+			m := s.move_stack[idx]
+			if b.ply < s.pv_length[0] && m.is_same(s.pv_table[0][b.ply]) {
+				s.follow_pv = true
+				s.move_stack[idx].score += 10000000
+				break
+			}
 		}
 	}
 	
@@ -369,49 +359,25 @@ fn (mut s Search) check_time() {
 
 // Helpers
 fn (b Board) reps() int {
-	// Check history for repetitions
-	// Loop from 0 to hply-1
-	// Count how many times current hash appears.
-	// Since we don't have incremental hash history, 
-	// we rely on Move history and reconstructing? Too slow.
-	
-	// Fast approach if we had `hist []u64` of hashes.
-	// `b.hist` is `[]Hist`. `Hist` has `hash u64`.
-	// We should use it.
-	
+	// Check for repetitions in the history
+	// Only check back to the last irreversible move (capture or pawn move)
+	// which resets the fifty counter
 	if b.hply == 0 { return 0 }
 	
-	// TSCP uses `hash_b` and `hash_w`.
-	// Let's assume `b.hash_key()` generates current hash.
-	// We need to compare current hash with previous positions.
+	mut count := 0
+	current_hash := b.hash
 	
-	// Wait, if Zobrist isn't implemented (func returns 0), checks fail.
-	// I need Zobrist first.
-	// If Zobrist is not available, I can't check repetitions efficiently.
+	// Search backwards through history
+	// Only check positions since last fifty reset
+	start_idx := if b.hply > b.fifty { b.hply - b.fifty } else { 0 }
 	
-	// TSCP doesn't use Zobrist for Repetition? 
-	// TSCP uses `hash` struct member in `hist`.
-	// "The program relies on the hash variables to detect repetitions."
+	for i in start_idx .. b.hply {
+		if b.hist[i].hash == current_hash {
+			count++
+		}
+	}
 	
-	// If I haven't implemented Zobrist updates in `make_move`, `hist[i].hash` is 0.
-	// `b.hash_key()` returns 0.
-	// So 0 == 0 always.
-	// If `reps()` checks:
-	/*
-	    for i in 0 .. b.hply {
-	        if b.hist[i].hash == current_hash { count++ }
-	    }
-	*/
-	// If everything is 0, count = hply.
-	// reps > 0 always. returns 0 score.
-	// Engine never moves? No, `search` proceeds.
-	// Why?
-	
-	// Actually, `reps()` I saw earlier was just `return 0`.
-	// So it effectively disables repetition check.
-	// This explains WHY we have so many repetitions.
-	
-	return 0
+	return count
 }
 
 fn (m Move) is_same(other Move) bool {

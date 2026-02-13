@@ -12,6 +12,7 @@ pub mut:
 	hply   int // History ply (moves since start of game)
 	ply    int // Search ply (distance from root)
 	hist   []Hist
+	hash   u64 // Zobrist hash
 }
 
 pub fn new_board() Board {
@@ -52,6 +53,9 @@ pub fn (mut b Board) init_board() {
 	b.fifty = 0
 	b.hply = 0
 	b.ply = 0
+	
+	// Initialize hash
+	b.set_hash()
 }
 
 fn (mut b Board) place_pieces(c int, start_sq int) {
@@ -168,6 +172,9 @@ pub fn (mut b Board) parse_fen(fen string) {
 	if parts.len > 4 {
 		b.fifty = parts[4].int()
 	}
+	
+	// Initialize hash after parsing
+	b.set_hash()
 }
 
 pub fn (b Board) print() {
@@ -230,4 +237,20 @@ pub fn (mut b Board) perft(depth int) u64 {
 		}
 	}
 	return nodes
+}
+
+// Zobrist hash initialization
+pub fn (mut b Board) set_hash() {
+	b.hash = 0
+	for i in 0..64 {
+		if b.color[i] != empty {
+			b.hash ^= hash_piece[b.color[i]][b.piece[i]][i]
+		}
+	}
+	if b.side == dark {
+		b.hash ^= hash_side
+	}
+	if b.ep != -1 {
+		b.hash ^= hash_ep[b.ep]
+	}
 }

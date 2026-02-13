@@ -18,7 +18,7 @@ pub fn (mut b Board) make_move(m Move) bool {
 		castle: b.castle
 		ep: b.ep
 		fifty: b.fifty
-		hash: 0 // TODO: Hash
+		hash: b.hash
 	}
 	b.hist << h
 	b.hply++
@@ -46,27 +46,46 @@ pub fn (mut b Board) make_move(m Move) bool {
 			// White moves ep (e.g. e5-f6), captures f5 (to+8? No to-8? No).
 			// Start: e5. End: f6. EP sq is f6. Captured pawn is at f5.
 			// White capturing en passant: Target is `to`. Pawn is at `to + 8` (Rank 5 -> Row 3. Target Row 2. diff +8)
+			b.hash ^= hash_piece[dark][pawn][to + 8]
 			b.color[to + 8] = empty
 			b.piece[to + 8] = empty
 		} else {
 			// Black capturing ep: Target `to`. Pawn at `to - 8`.
+			b.hash ^= hash_piece[light][pawn][to - 8]
 			b.color[to - 8] = empty
 			b.piece[to - 8] = empty
 		}
 	}
 	
 	// Update board (Move piece)
+	// Remove piece from source
+	b.hash ^= hash_piece[b.side][b.piece[from]][from]
+	
+	// Capture: remove captured piece from target
+	if (m.bits & m_capture) != 0 && (m.bits & m_ep) == 0 {
+		b.hash ^= hash_piece[b.xside][b.piece[to]][to]
+	}
+	
+	// Place piece on target (potentially promoted)
+	moved_piece := if (m.bits & m_promote) != 0 { m.promote } else { b.piece[from] }
+	b.hash ^= hash_piece[b.side][moved_piece][to]
+	
 	b.color[to] = b.side
-	b.piece[to] = if (m.bits & m_promote) != 0 { m.promote } else { b.piece[from] }
+	b.piece[to] = moved_piece
 	b.color[from] = empty
 	b.piece[from] = empty
 	
 	// Update Castle Permissions
 	b.castle &= castle_mask[from] & castle_mask[to]
+	// No hash update needed for castle permissions in TSCP-style
 	
 	// Update EP
+	if b.ep != -1 {
+		b.hash ^= hash_ep[b.ep]  // Remove old EP
+	}
 	if (m.bits & m_pawn_start) != 0 {
 		if b.side == light { b.ep = to + 8 } else { b.ep = to - 8 }
+		b.hash ^= hash_ep[b.ep]  // Add new EP
 	} else {
 		b.ep = -1
 	}
@@ -79,6 +98,7 @@ pub fn (mut b Board) make_move(m Move) bool {
 	}
 	
 	// Switch side
+	b.hash ^= hash_side  // Toggle side
 	b.side ^= 1
 	b.xside ^= 1
 	
@@ -101,6 +121,9 @@ pub fn (mut b Board) takeback() {
 	m := h.m
 	from := m.from
 	to := m.to
+	
+	// Restore hash
+	b.hash = h.hash
 	
 	// Switch side back
 	b.side ^= 1

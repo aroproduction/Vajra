@@ -68,3 +68,41 @@ pub const piece_value = [ 100, 300, 300, 500, 900, 0, 0 ]!
 
 // Piece chars
 pub const piece_char = "pnbrqk"
+
+// Zobrist random numbers for hashing
+pub const hash_piece = init_hash_piece()
+pub const hash_side = u64(0x3141592653589793)
+pub const hash_ep = init_hash_ep()
+
+fn init_hash_piece() [2][6][64]u64 {
+	mut h := [2][6][64]u64{}
+	mut seed := u64(0)
+	for color in 0..2 {
+		for piece in 0..6 {
+			for sq in 0..64 {
+				seed = xorshift64(seed)
+				h[color][piece][sq] = seed
+			}
+		}
+	}
+	return h
+}
+
+fn init_hash_ep() [64]u64 {
+	mut h := [64]u64{}
+	mut seed := u64(0x123456789ABCDEF0)
+	for i in 0..64 {
+		seed = xorshift64(seed)
+		h[i] = seed
+	}
+	return h
+}
+
+fn xorshift64(x u64) u64 {
+	mut val := x
+	if val == 0 { val = 0x123456789ABCDEF0 }
+	val ^= val << 13
+	val ^= val >> 7
+	val ^= val << 17
+	return val
+}

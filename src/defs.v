@@ -60,7 +60,7 @@ pub mut:
 	castle  int
 	ep      int
 	fifty   int
-	hash    int
+	hash    u64
 }
 
 pub fn (m Move) str() string {

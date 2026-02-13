@@ -193,6 +193,5 @@ fn index_of(arr []string, val string) int {
 
 // Helper to calculate polyglot or simple hash
 pub fn (b Board) hash_key() u64 {
-	// TODO: Zobrist
-	return 0
+	return b.hash
 }

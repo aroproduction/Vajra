@@ -232,3 +232,74 @@ fn (b Board) gen_ep(mut moves []Move) {
 		}
 	}
 }
+
+// Generate only capture moves for quiescence search
+pub fn (b Board) gen_caps(mut moves []Move) {
+	for i in 0 .. 64 {
+		if b.color[i] == b.side {
+			p := b.piece[i]
+			if p == pawn {
+				b.gen_pawn_captures(i, mut moves)
+			} else {
+				// Sliding / Non-sliding pieces - only captures
+				slide_piece := slide[p]
+				offset_count_val := offsets_count[p]
+				
+				for j in 0 .. offset_count_val {
+					off := offset[p*8 + j]
+					mut n_120 := mailbox64[i] + off
+					mut n_64 := mailbox[n_120]
+					
+					for n_64 != -1 {
+						if b.color[n_64] != empty {
+							if b.color[n_64] == b.xside {
+								// Capture only
+								moves << Move{
+									from: i
+									to: n_64
+									bits: m_capture
+									promote: 0
+									score: 0
+								}
+							}
+							break
+						}
+						// Skip non-captures
+						if !slide_piece { break }
+						n_120 += off
+						n_64 = mailbox[n_120]
+					}
+				}
+			}
+		}
+	}
+	
+	// En Passant is a capture
+	if b.ep != -1 {
+		b.gen_ep(mut moves)
+	}
+}
+
+fn (b Board) gen_pawn_captures(i int, mut moves []Move) {
+	col := i & 7
+	
+	if b.side == light {
+		// Capture Left
+		if col > 0 && b.color[i - 9] == dark {
+			b.add_pawn_move(i, i - 9, m_capture, mut moves)
+		}
+		// Capture Right
+		if col < 7 && b.color[i - 7] == dark {
+			b.add_pawn_move(i, i - 7, m_capture, mut moves)
+		}
+	} else {
+		// Capture Left
+		if col > 0 && b.color[i + 7] == light {
+			b.add_pawn_move(i, i + 7, m_capture, mut moves)
+		}
+		// Capture Right
+		if col < 7 && b.color[i + 9] == light {
+			b.add_pawn_move(i, i + 9, m_capture, mut moves)
+		}
+	}
+}
