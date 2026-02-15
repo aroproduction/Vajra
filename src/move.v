@@ -1,4 +1,4 @@
-module main
+module src
 
 pub fn (mut b Board) make_move(m Move) bool {
 	if m.bits == 0 && m.from == 0 && m.to == 0 { return false } // Null move check

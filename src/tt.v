@@ -1,4 +1,4 @@
-module main
+module src
 
 // Transposition Table Entry Types
 pub const tt_exact = 0   // Exact score (PV node)

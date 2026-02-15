@@ -1,4 +1,4 @@
-module main
+module src
 
 // Colors
 pub const light = 0
@@ -22,6 +22,60 @@ pub const e8 = 4
 pub const f8 = 5
 pub const g8 = 6
 pub const h8 = 7
+
+pub const a7 = 8
+pub const b7 = 9
+pub const c7 = 10
+pub const d7 = 11
+pub const e7 = 12
+pub const f7 = 13
+pub const g7 = 14
+pub const h7 = 15
+
+pub const a6 = 16
+pub const b6 = 17
+pub const c6 = 18
+pub const d6 = 19
+pub const e6 = 20
+pub const f6 = 21
+pub const g6 = 22
+pub const h6 = 23
+
+pub const a5 = 24
+pub const b5 = 25
+pub const c5 = 26
+pub const d5 = 27
+pub const e5 = 28
+pub const f5 = 29
+pub const g5 = 30
+pub const h5 = 31
+
+pub const a4 = 32
+pub const b4 = 33
+pub const c4 = 34
+pub const d4 = 35
+pub const e4 = 36
+pub const f4 = 37
+pub const g4 = 38
+pub const h4 = 39
+
+pub const a3 = 40
+pub const b3 = 41
+pub const c3 = 42
+pub const d3 = 43
+pub const e3 = 44
+pub const f3 = 45
+pub const g3 = 46
+pub const h3 = 47
+
+pub const a2 = 48
+pub const b2 = 49
+pub const c2 = 50
+pub const d2 = 51
+pub const e2 = 52
+pub const f2 = 53
+pub const g2 = 54
+pub const h2 = 55
 
 pub const a1 = 56
 pub const b1 = 57

@@ -1,4 +1,4 @@
-module main
+module src
 
 import os
 import time
@@ -45,8 +45,8 @@ pub fn uci_loop() {
 		match cmd {
 			"quit" { break }
 			"uci" {
-				println("id name Vajra 2.0")
-				println("id author GitHub Copilot")
+				println("id name Vajra")
+				println("id author Vajra Team")
 				// println("option name Hash type spin default 64 min 1 max 1024")
 				println("uciok")
 			}

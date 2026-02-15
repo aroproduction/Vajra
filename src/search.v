@@ -1,4 +1,4 @@
-module main
+module src
 
 import time
 

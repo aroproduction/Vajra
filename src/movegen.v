@@ -1,4 +1,4 @@
-module main
+module src
 
 // Generate pseudo-legal moves
 pub fn (b Board) gen(mut moves []Move) {

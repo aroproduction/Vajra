@@ -1,2 +1,45 @@
+# Vajra2 .gitignore
 
+# Build artifacts
 bin/
+*.exe
+*.out
+
+# V compiler generated files
+*.c
+*.h
+*.o
+*.so
+*.dll
+*.dylib
+
+# Test scripts (internal development)
+test_scripts/
+
+# Editor specific files
+*~
+*.swp
+*.swo
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# OS specific files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Profiling and debugging files
+*.prof
+*.trace
+*.pprof
+
+# Test artifacts
+tests/nimcache/
+tests/*.out
+
+# Match results
+match_results/
+*.pgn
+*.log

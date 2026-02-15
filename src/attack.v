@@ -1,4 +1,4 @@
-module main
+module src
 
 // Check if square sq is attacked by side s
 // sq is 64-sq index.

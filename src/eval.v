@@ -1,4 +1,4 @@
-module main
+module src
 
 // TSCP Evaluation Constants
 const doubled_pawn_penalty   = 10
