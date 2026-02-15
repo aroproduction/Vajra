@@ -24,41 +24,32 @@ Vajra 2.0 is a UCI-compliant chess engine combining the pedagogical clarity of T
 
 ## ✨ Key Features
 
-### 🔍 Search Algorithm
-- **Negamax with Alpha-Beta Pruning** - Efficient minimax variant
-- **Transposition Table** - 64 MB hash table with Zobrist hashing for position caching
-- **Null Move Pruning** - Forward pruning for significant tree reduction
-- **Iterative Deepening** - Progressive depth increase with time management
-- **Quiescence Search** - Tactical search extension to avoid horizon effect
-- **Move Ordering Optimizations:**
-  - Principal Variation (PV) following
-  - Killer move heuristic (2 per ply)
-  - History heuristic for quiet moves
-  - MVV/LVA (Most Valuable Victim/Least Valuable Attacker) for captures
-- **Check Extensions** - Extends search when in check
-- **Repetition Detection** - Proper 3-fold repetition with smart draw claiming
-- **Mate Distance Pruning** - Optimized mate finding
+### 🔍 Search
+- Negamax with alpha-beta pruning
+- Transposition table (64 MB hash)
+- Null move pruning
+- Iterative deepening
+- Quiescence search
+- Move ordering (PV, killer moves, history heuristic, MVV/LVA)
+- Check extensions
+- Repetition detection
+- Mate distance pruning
 
-### 📊 Evaluation Function
-
-**Positional Understanding:**
-- **Center Control** - Bonuses for central pawn and piece placement
-- **Piece Development** - Rewards for early piece activation
-- **Bishop Pair** - Bonus for having both bishops
-- **Knight Outposts** - Rewards for supported knights in enemy territory
-- **Pawn Structure Analysis:**
-  - Passed pawns with exponential scaling (10cp → 180cp by rank)
-  - Penalties for doubled, isolated, and backward pawns
-  - Discourages premature wing pawn advances
-- **Rook Placement** - Bonuses for open files and 7th rank
-- **King Safety** - Pawn shield evaluation, penalties for exposed files
-- **Game Phase Awareness** - Different priorities for opening/middlegame/endgame
+### 📊 Evaluation
+- Material and positional assessment
+- Center control bonuses
+- Piece development rewards
+- Bishop pair bonus
+- Pawn structure analysis (passed, doubled, isolated pawns)
+- Rook placement (open files, 7th rank)
+- King safety evaluation
+- Game phase awareness
 
 ### 🏗️ Architecture
-- **Zero-Allocation Move Generation** - Pre-allocated move stacks minimize GC pauses
-- **Zobrist Hashing** - Incremental position hashing for fast position recognition
-- **UCI Protocol** - Full Universal Chess Interface support
-- **Efficient Board Representation** - 64-square array with validation
+- UCI protocol compliant
+- Zobrist hashing
+- Efficient board representation
+- Zero-allocation move generation
 
 ## 🚀 Download & Compilation
 
@@ -142,27 +133,7 @@ Ponder=Off
 
 Vajra can use any generic opening book in standard formats (CTG, BIN, PGN).
 
-## 📈 Performance
-
-### Match Results vs TSCP 1.83
-
-**6-game match (3 minutes per game):**
-- **Score:** Vajra 4.5 - TSCP 1.5 (75%)
-- **Record:** 3 wins, 0 losses, 3 draws
-- **Elo Improvement:** ~100+ Elo over TSCP
-
-**Key Achievements:**
-- Successfully finds and executes forced mates
-- Proper UCI mate score display (`mate 5` instead of `cp 9999`)
-- Strong positional play with improved opening phase
-- No critical bugs in repetition or mate detection
-
-### Search Performance
-- **Nodes Searched:** ~365K nodes/second (depth 10 from startpos)
-- **Typical Depth:** 8-12 ply in middlegame (3s/move)
-- **Mate Finding:** Reliable mate detection up to mate-in-15+
-
-## 🔧 Technical Details
+##  Technical Details
 
 ### Move Ordering Priority
 1. **PV Move** (10,000,000) - From previous iteration
